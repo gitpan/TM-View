@@ -1,0 +1,12 @@
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         TM-View
+version:      0.1
+version_from: 
+installdirs:  site
+requires:
+    Test::More:                    0.47
+    TM:                            1.26
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.30_01
