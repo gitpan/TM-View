@@ -1,9 +1,9 @@
 package TM::View;
-# $Id: View.pm,v 1.3 2007-12-03 03:28:35 az Exp $ 
+# $Id: View.pm,v 1.4 2008-01-21 03:32:16 az Exp $ 
 
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = qw(('$Revision: 1.3 $'))[1];
+$VERSION = qw(('$Revision: 1.4 $'))[1];
 
 require Exporter;
 require AutoLoader;
@@ -1095,6 +1095,7 @@ sub make_listlet
     {
 	my ($a,$e,$af,$url)=@$_;
 	
+	next if (!$a);
 	$writer->startTag("author");$writer->characters($a);
 	
 	$writer->dataElement("email",$e) if ($e);
