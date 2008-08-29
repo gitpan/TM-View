@@ -1,14 +1,14 @@
 package TM::View;
-# $Id: View.pm,v 1.4 2008-01-21 03:32:16 az Exp $ 
+# $Id: View.pm,v 1.5 2008-08-29 02:39:34 az Exp $ 
 
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = qw(('$Revision: 1.4 $'))[1];
+$VERSION = qw(('$Revision: 1.5 $'))[1];
 
 require Exporter;
 require AutoLoader;
 
-use TM;
+use TM 1.43;
 use TM::Literal;
 use base qw(TM);
 use Data::Dumper;
@@ -265,9 +265,8 @@ sub sequence_add
     # anyid is too extensive: returns occs,bns,ins of scope=this or of type=this, too!
     # but those are not interesting for this topic...
     my @allelem=$self->{tm}->match(TM->FORALL,anyid=>$tid);
-    my $base=$self->{tm}->baseuri;
     my @interesting=grep { $_->[TM->KIND]==TM->ASSOC # assocs are fine
-			       || $self->{tm}->is_x_player($_,$tid,$base."thing") # as are names/occs where we are directly involved
+			       || $self->{tm}->is_x_player($_,$tid,"thing") # as are names/occs where we are directly involved
 			   } (@allelem);
     map { push @how,[$_->[TM->LID],
 		     $self->_default_style($tid,$_->[TM->LID])] } (sort { _sort_elems() } @interesting);
@@ -573,9 +572,10 @@ sub _find_tidindex
     my ($self,$tidorindex,$where)=@_;
     my $index;
 
-    # topic or index? tids start with baseuri    
-    if ($tidorindex=~/^$self->{tm}->{baseuri}/)
+    # topic or index? SOME tids start with baseuri, but all indices are numeric
+    if ($tidorindex!~/^[0-9]+$/)
     {
+	# tid
 	for (0..$#{$where})
 	{
 	    # are we searching in the sequence or the style list of a sequenced topic?
@@ -624,7 +624,6 @@ sub _find_tid_anywhere
 sub _find_applicable
 {
     my ($self,$map,$aid)=@_;
-    my $base=$self->{tm}->{baseuri};
 
     my @found=();
     my @lookfor;
@@ -638,7 +637,7 @@ sub _find_applicable
 
     if ($kind == TM->NAME || $kind == TM->OCC)
     {
-	push @lookfor,$type,$map->get_x_players($ass,$base."thing");
+	push @lookfor,$type,$map->get_x_players($ass,"thing");
     }
     else
     {
@@ -918,7 +917,6 @@ sub topic_as_listlet
     $writer->startTag("listlet","title"=>$title);
 
     my $map=$self->{tm};
-    my $base=$map->{baseuri};
     
     my ($typed_oc,$typed_ass)=("","");
     # rest are bns, ocs, sundry associations
@@ -952,14 +950,14 @@ sub topic_as_listlet
 	{
 	    # (extra) basename -> plain listlet entry
 	    $writer->dataElement("listlet","",
-				 title=>($map->get_x_players($a,$base."value"))[0]->[0],@cls);
+				 title=>($map->get_x_players($a,"value"))[0]->[0],@cls);
 	}
 	elsif ($a->[TM->KIND]==TM->OCC)
 	{
 	    # occurrence: inline text or hyperlink, with extra type-wrapper if nontrivially typed
 	    # and if wanted
 	    my $extra;
-	    if ($type ne $base."occurrence" && !$typed_oc && $style->{_type_on})
+	    if ($type ne "occurrence" && !$typed_oc && $style->{_type_on})
 	    {
 		# extra indentation/wrapping using the type's basename
 		# which we leave open and dangling...
@@ -974,7 +972,7 @@ sub topic_as_listlet
 		# where we don't make indentation/wrapping listlets
 		$typed_oc=$type;
 	    }
-	    my $value=($map->get_x_players($a,$base."value"))[0];
+	    my $value=($map->get_x_players($a,"value"))[0];
 	    if ($value->[1] eq TM::Literal->URI)
 	    {
 		$writer->dataElement('listlet','','url'=>$value->[0],@cls);		    
@@ -1107,7 +1105,6 @@ sub make_listlet
     
     # main part: walk through sequence and print every active style element
     my $map=$self->{tm};
-    my $base=$map->{baseuri};
 
     for my $i (0..$#{$self->{sequence}})
     {
@@ -1140,12 +1137,12 @@ sub _default_style
     if ($a->[TM->KIND]==TM->OCC)
     {
 	# non-trivially typed -> _type_on
-	$style{_type_on}=1 if ($a->[TM->TYPE] ne $map->{baseuri}."occurrence");
+	$style{_type_on}=1 if ($a->[TM->TYPE] ne "occurrence");
     }
     elsif ($a->[TM->KIND]==TM->ASSOC)
     {
 	# if this is isa/class/instance, then no _role_on please!
-	my $roleon=$a->[TM->TYPE] eq $map->{baseuri}."isa"?0:1;
+	my $roleon=$a->[TM->TYPE] eq "isa"?0:1;
 	# prime the _player_order and _player_styles
 	my @players=@{$a->[TM->PLAYERS]};
 	$style{_player_order}=[0..$#players];
@@ -1211,32 +1208,31 @@ sub find_nicename
     die "argument is not a TM::View object\n" if (!$self || ref($self) ne __PACKAGE__);
 
     my $map=$self->{tm};
-    my $base=$map->{baseuri};
     my $nice;
 
     if (!$ownstyle || $scope)
     {
 	# a minor hack for class/instance relationships: if the map user hasn't given
 	# a nice setup, we use "instances:" and "is a:", rsp.
-	if ($tid eq $base."isa")
+	if ($tid eq "isa")
 	{
-	    return (0,$scope eq $base."class"?"instances:":"is a:");
+	    return (0,$scope eq "class"?"instances:":"is a:");
 	}
 
 	# this is for association titles and typed-occurrence titling
 	# we look in the map for a basename assertion for this
 	# topic with the proper scope (if given)
-	my @bns=$map->match(TM->FORALL,topic=>$tid,char=>1,type=>$base."name");
+	my @bns=$map->match(TM->FORALL,topic=>$tid,char=>1,type=>"name");
 
 	# if not scoped: return first bn or tid without base, 
 	# if scoped: first bn with matching scope, unscoped basename, or tid without base
 	my ($firstbn,$usbn);
 	for my $a (@bns)
 	{
-	    my $this=($map->get_x_players($a,$base."value"))[0]->[0];
+	    my $this=($map->get_x_players($a,"value"))[0]->[0];
 	    $firstbn||=$this;
 	    return (0,$this) if (!$scope || $a->[TM->SCOPE] eq $scope);
-	    $usbn=$this if ($a->[TM->SCOPE] eq $base."us");
+	    $usbn=$this if ($a->[TM->SCOPE] eq "us");
 	}
 	return (0,$usbn) if ($usbn && $scope);
 	return (0,$firstbn) if ($firstbn && !$scope);
@@ -1255,13 +1251,14 @@ sub find_nicename
 		next if (!$styles->[$i]->[1]->{_on});
 		my $a=$map->retrieve($styles->[$i]->[0]);
 		next if ($a->[TM->KIND]!=TM->NAME);
-		return ($i,($map->get_x_players($a,$base."value"))[0]->[0]);
+		return ($i,($map->get_x_players($a,"value"))[0]->[0]);
 	    }
 	}
     }
 
     # nothing found? tid without basename, then
     $nice=$tid;
+    my $base=$self->{tm}->{baseuri};
     $nice=~s/^$base//;
     return (0,$nice);
 }
@@ -1280,7 +1277,7 @@ Alexander Zangerl, <alphazulu@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2007 Alexander Zangerl
+Copyright 2007, 2008 Alexander Zangerl
 
 This library is free software; you can redistribute it and/or modify it under the same terms as Perl
 itself.
