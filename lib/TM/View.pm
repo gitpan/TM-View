@@ -1,9 +1,9 @@
 package TM::View;
-# $Id: View.pm,v 1.5 2008-08-29 02:39:34 az Exp $ 
+# $Id: View.pm,v 1.9 2009-11-27 01:32:55 az Exp $ 
 
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = qw(('$Revision: 1.5 $'))[1];
+$VERSION = qw(('$Revision: 1.9 $'))[1];
 
 require Exporter;
 require AutoLoader;
@@ -243,7 +243,8 @@ sub sequence_add
     return undef if (grep($_->[0]->[0] eq $tid,@{$self->{sequence}}));
     return undef if (!$self->{tm}->midlet($tid));
 
-   
+    my $compat=(exists($self->{tm}->{usual_suspects})?$self->{tm}->{baseuri}:"");   
+
     # find the right spot to put things and make space
     if (!defined($location) || $location<0 || $location>$lastindex)
     {
@@ -266,7 +267,7 @@ sub sequence_add
     # but those are not interesting for this topic...
     my @allelem=$self->{tm}->match(TM->FORALL,anyid=>$tid);
     my @interesting=grep { $_->[TM->KIND]==TM->ASSOC # assocs are fine
-			       || $self->{tm}->is_x_player($_,$tid,"thing") # as are names/occs where we are directly involved
+			       || $self->{tm}->is_x_player($_,$tid,$compat."thing") # as are names/occs where we are directly involved
 			   } (@allelem);
     map { push @how,[$_->[TM->LID],
 		     $self->_default_style($tid,$_->[TM->LID])] } (sort { _sort_elems() } @interesting);
@@ -631,13 +632,13 @@ sub _find_applicable
     my $ass=$map->retrieve($aid);
     return @found if (!$ass);	# this is just a new midlet, not an assoc; uninteresting
 
-	    
+    my $compat=(exists($map->{usual_suspects})?$map->{baseuri}:"");
     my ($lid,$scope,$kind,$type,$players,$roles)=
 	@{$ass}[TM->LID,TM->SCOPE,TM->KIND,TM->TYPE,TM->PLAYERS,TM->ROLES];
 
     if ($kind == TM->NAME || $kind == TM->OCC)
     {
-	push @lookfor,$type,$map->get_x_players($ass,"thing");
+	push @lookfor,$type,$map->get_x_players($ass,$compat."thing");
     }
     else
     {
@@ -902,6 +903,8 @@ sub topic_as_listlet
     my $index=$self->_find_tidindex($tidorindex,$self->{sequence});
     return undef if (!defined $index);
 
+    my $compat=(exists($self->{tm}->{usual_suspects})?$self->{tm}->{baseuri}:"");
+
     if (!$ios || !$writer)
     {
 	$ios = IO::String->new;
@@ -918,7 +921,7 @@ sub topic_as_listlet
 
     my $map=$self->{tm};
     
-    my ($typed_oc,$typed_ass)=("","");
+    my ($typed_oc,$typed_ass,$typed_bn)=("","","");
     # rest are bns, ocs, sundry associations
     for my $i (1..$#$t)
     {
@@ -944,20 +947,33 @@ sub topic_as_listlet
 	    $typed_ass="";
 	    $writer->endTag("listlet");
 	}
+	# ditto basename
+	if ($typed_bn && ( $a->[TM->KIND]!=TM->NAME || $type ne $typed_oc || !$style->{_type_on}))
+	{
+	    $typed_bn="";
+	    $writer->endTag("listlet");
+	}
 	
 	# what is this thing? 
 	if ($a->[TM->KIND]==TM->NAME)
 	{
-	    # (extra) basename -> plain listlet entry
+	    # (extra) basename: type-prefixed listlet entry
+	    if ($type ne $compat."name" && !$typed_bn && $style->{_type_on})
+	    {
+		$writer->startTag("listlet",
+				  title=>($self->find_nicename($type,undef,undef))[1],
+				  ("bullet"=>1));
+		$typed_bn=$type;
+	    }
 	    $writer->dataElement("listlet","",
-				 title=>($map->get_x_players($a,"value"))[0]->[0],@cls);
+				 title=>($map->get_x_players($a,$compat."value"))[0]->[0],@cls);
 	}
 	elsif ($a->[TM->KIND]==TM->OCC)
 	{
 	    # occurrence: inline text or hyperlink, with extra type-wrapper if nontrivially typed
 	    # and if wanted
 	    my $extra;
-	    if ($type ne "occurrence" && !$typed_oc && $style->{_type_on})
+	    if ($type ne $compat."occurrence" && !$typed_oc && $style->{_type_on})
 	    {
 		# extra indentation/wrapping using the type's basename
 		# which we leave open and dangling...
@@ -972,7 +988,7 @@ sub topic_as_listlet
 		# where we don't make indentation/wrapping listlets
 		$typed_oc=$type;
 	    }
-	    my $value=($map->get_x_players($a,"value"))[0];
+	    my $value=($map->get_x_players($a,$compat."value"))[0];
 	    if ($value->[1] eq TM::Literal->URI)
 	    {
 		$writer->dataElement('listlet','','url'=>$value->[0],@cls);		    
@@ -1015,7 +1031,7 @@ sub topic_as_listlet
     }
     # if a typed occurrence was the last scheduled element, then we need
     # to close the dangling container
-    $writer->endTag("listlet") if ($typed_oc || $typed_ass); 
+    $writer->endTag("listlet") if ($typed_oc || $typed_ass || $typed_bn); 
     $writer->endTag("listlet"); # the "page" listlet
     return ${$ios->string_ref};   
 }    
@@ -1129,20 +1145,27 @@ sub _default_style
     # a topic itself -> on and be done with it.
     return \%style if ($context eq $thing);	
 
+    my $compat=(exists($self->{tm}->{usual_suspects})?$self->{tm}->{baseuri}:"");
 
     # what's the nature of this thing?
     my $a=$map->retrieve($thing);
     die "$thing is not an assertion!\n" if (!$a);
     
+    # occs and basenames: type display
     if ($a->[TM->KIND]==TM->OCC)
     {
 	# non-trivially typed -> _type_on
-	$style{_type_on}=1 if ($a->[TM->TYPE] ne "occurrence");
+	$style{_type_on}=1 if ($a->[TM->TYPE] ne $compat."occurrence");
+    }
+    elsif ($a->[TM->KIND]==TM->NAME)
+    {
+	# non-trivially typed -> _type_on
+	$style{_type_on}=1 if ($a->[TM->TYPE] ne $compat."name");
     }
     elsif ($a->[TM->KIND]==TM->ASSOC)
     {
 	# if this is isa/class/instance, then no _role_on please!
-	my $roleon=$a->[TM->TYPE] eq "isa"?0:1;
+	my $roleon=$a->[TM->TYPE] eq $compat."isa"?0:1;
 	# prime the _player_order and _player_styles
 	my @players=@{$a->[TM->PLAYERS]};
 	$style{_player_order}=[0..$#players];
@@ -1155,7 +1178,6 @@ sub _default_style
     # everthing is bulleted by default
     $style{bullet}=1;
     
-    # basenames fall through: nothing special
     return \%style;
 }
 
@@ -1210,29 +1232,31 @@ sub find_nicename
     my $map=$self->{tm};
     my $nice;
 
+    my $compat=(exists($self->{tm}->{usual_suspects})?$self->{tm}->{baseuri}:"");
+
     if (!$ownstyle || $scope)
     {
 	# a minor hack for class/instance relationships: if the map user hasn't given
 	# a nice setup, we use "instances:" and "is a:", rsp.
-	if ($tid eq "isa")
+	if ($tid eq $compat."isa")
 	{
-	    return (0,$scope eq "class"?"instances:":"is a:");
+	    return (0,$scope eq $compat."class"?"instances:":"is a:");
 	}
 
 	# this is for association titles and typed-occurrence titling
 	# we look in the map for a basename assertion for this
 	# topic with the proper scope (if given)
-	my @bns=$map->match(TM->FORALL,topic=>$tid,char=>1,type=>"name");
+	my @bns=$map->match(TM->FORALL,topic=>$tid,char=>1,type=>$compat."name");
 
 	# if not scoped: return first bn or tid without base, 
 	# if scoped: first bn with matching scope, unscoped basename, or tid without base
 	my ($firstbn,$usbn);
 	for my $a (@bns)
 	{
-	    my $this=($map->get_x_players($a,"value"))[0]->[0];
+	    my $this=($map->get_x_players($a,$compat."value"))[0]->[0];
 	    $firstbn||=$this;
 	    return (0,$this) if (!$scope || $a->[TM->SCOPE] eq $scope);
-	    $usbn=$this if ($a->[TM->SCOPE] eq "us");
+	    $usbn=$this if ($a->[TM->SCOPE] eq $compat."us");
 	}
 	return (0,$usbn) if ($usbn && $scope);
 	return (0,$firstbn) if ($firstbn && !$scope);
@@ -1251,7 +1275,7 @@ sub find_nicename
 		next if (!$styles->[$i]->[1]->{_on});
 		my $a=$map->retrieve($styles->[$i]->[0]);
 		next if ($a->[TM->KIND]!=TM->NAME);
-		return ($i,($map->get_x_players($a,"value"))[0]->[0]);
+		return ($i,($map->get_x_players($a,$compat."value"))[0]->[0]);
 	    }
 	}
     }

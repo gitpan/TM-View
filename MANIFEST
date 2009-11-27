@@ -1,4 +1,5 @@
 MANIFEST			This list of files
+CHANGES
 Makefile.PL
 lib/TM/View.pm
 t/01view.t
