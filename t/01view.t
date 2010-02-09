@@ -191,12 +191,20 @@ $v->style($n,1,%os);
 
 
 # style index 3 is the typed occ, _type_on is on by default
-ok($l=~/<listlet title="search"/,"_type_on produces encapsulation");
+# typed occ, _type_autocolon is on by default
+ok($l=~/<listlet title="search:"/,"_type_on produces encapsulation and _type_autocolon is default");
+(undef,%os)=$v->style($n,3);
+$os{_type_autocolon}=0;
+$v->style($n,3,%os);
+$l=$v->topic_as_listlet($n);
+ok($l=~/<listlet title="search"/,"_type_autocolon can be disabled");
+
 (undef,%os)=$v->style($n,3);
 $os{_type_on}=0;
 $v->style($n,3,%os);
 $l=$v->topic_as_listlet($n);
 ok($l!~/<listlet title="search"/,"_type_on can be disabled");
+
 
 # style index 2 is an assoc, 0th is topic itself, 1st is something shown
 ok($l=~/<listlet[^>]+title="third \[brole\]"/,"_role_on produces text");

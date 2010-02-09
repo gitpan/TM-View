@@ -1,9 +1,9 @@
 package TM::View;
-# $Id: View.pm,v 1.9 2009-11-27 01:32:55 az Exp $ 
+# $Id: View.pm,v 1.10 2010-02-09 05:02:27 az Exp $ 
 
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = qw(('$Revision: 1.9 $'))[1];
+$VERSION = qw(('$Revision: 1.10 $'))[1];
 
 require Exporter;
 require AutoLoader;
@@ -855,6 +855,11 @@ Without the attribute, only
 
 would be output.
 
+=item _type_autocolon: 
+
+With this and _type_on both active, the enclosing title text is guaranteed to end in a colon: if it doesn't do so
+already, then one is added. _type_autocolon is ignored if _type_on isn't active.
+
 =item _player_order
 
 Controls the display ordering of players for I<this> particular display of an association. This is an array reference, 
@@ -960,8 +965,11 @@ sub topic_as_listlet
 	    # (extra) basename: type-prefixed listlet entry
 	    if ($type ne $compat."name" && !$typed_bn && $style->{_type_on})
 	    {
+		my $title=($self->find_nicename($type,undef,undef))[1];
+		$title.=":" if ($style->{_type_autocolon} && $title !~ /:$/);
+		
 		$writer->startTag("listlet",
-				  title=>($self->find_nicename($type,undef,undef))[1],
+				  title=>$title,
 				  ("bullet"=>1));
 		$typed_bn=$type;
 	    }
@@ -975,10 +983,13 @@ sub topic_as_listlet
 	    my $extra;
 	    if ($type ne $compat."occurrence" && !$typed_oc && $style->{_type_on})
 	    {
+		my $title=($self->find_nicename($type,undef,undef))[1];
+		$title.=":" if ($style->{_type_autocolon} && $title !~ /:$/);
+
 		# extra indentation/wrapping using the type's basename
 		# which we leave open and dangling...
 		$writer->startTag("listlet",
-				  title=>($self->find_nicename($type,undef,undef))[1],
+				  title=>$title,
 				  # style of the wrapper: only bullet 
 				  # fixme: i have not real good answer as to what style such 
 				  # an extra element should have: none? bulleted? common of children? 
@@ -1154,13 +1165,21 @@ sub _default_style
     # occs and basenames: type display
     if ($a->[TM->KIND]==TM->OCC)
     {
-	# non-trivially typed -> _type_on
-	$style{_type_on}=1 if ($a->[TM->TYPE] ne $compat."occurrence");
+	# non-trivially typed -> _type_on, also _type_autocolon
+	if ($a->[TM->TYPE] ne $compat."occurrence")
+	{	
+	    $style{_type_on}=1;
+	    $style{_type_autocolon}=1;
+	}
     }
     elsif ($a->[TM->KIND]==TM->NAME)
     {
-	# non-trivially typed -> _type_on
-	$style{_type_on}=1 if ($a->[TM->TYPE] ne $compat."name");
+	# non-trivially typed -> _type_on, also _type_autocolon
+	if ($a->[TM->TYPE] ne $compat."name")
+	{
+	    $style{_type_on}=1;
+	    $style{_type_autocolon}=1;
+	}
     }
     elsif ($a->[TM->KIND]==TM->ASSOC)
     {
@@ -1338,6 +1357,7 @@ __END__
 # _on is 1 if the element is to be shown
 # _is_changed is 1 if the element was modified during the last reconciliation run
 # _type_on for occurrences toggles display of type information in listlet
+# _type_autocolon for type info auto-colonify.
 # _player_order determines in which order association players are shown (array of indices)
 # _player_styles determines how association players are shown.
 # within _player_styles, _on and _role_on are special: _on toggles display of this player,

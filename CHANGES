@@ -1,3 +1,7 @@
+release 0.6 az Tue Feb  9 15:28:12 2010
+
+  added support for automatically adding colons to type listlets
+
 release 0.5 az  Fri Nov 27 11:33:55 2009
   
   added support for displaying typed basenames
