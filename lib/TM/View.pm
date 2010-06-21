@@ -1,9 +1,9 @@
 package TM::View;
-# $Id: View.pm,v 1.10 2010-02-09 05:02:27 az Exp $ 
+# $Id: View.pm,v 1.11 2010-06-20 13:29:34 az Exp $ 
 
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
-$VERSION = qw(('$Revision: 1.10 $'))[1];
+$VERSION = qw(('$Revision: 1.11 $'))[1];
 
 require Exporter;
 require AutoLoader;
@@ -618,7 +618,7 @@ sub _find_tid_anywhere
 
 # returns list of *sequenced* topics (their indices) that 
 # a given assertion applies to 
-# applies to: basename, oc -> type and topic in question; isa -> both topics 
+# applies to: basename, oc -> the topic in question; isa -> both topics 
 # association -> all role, type and player topics
 # uses whichmap to control where to get the assertion info from
 # returns a list of sequence indices or an empty list 
@@ -638,7 +638,7 @@ sub _find_applicable
 
     if ($kind == TM->NAME || $kind == TM->OCC)
     {
-	push @lookfor,$type,$map->get_x_players($ass,$compat."thing");
+	push @lookfor,$map->get_x_players($ass,$compat."thing");
     }
     else
     {

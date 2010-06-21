@@ -1,3 +1,8 @@
+release 0.7 az Sun Jun 20 23:30:00 2010
+ 
+  fixed reconciliation for existing topics that just became oc type topics;
+  these wrongly got the oc attached to themselves (instead of the proper owner)
+
 release 0.6 az Tue Feb  9 15:28:12 2010
 
   added support for automatically adding colons to type listlets

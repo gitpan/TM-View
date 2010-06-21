@@ -219,9 +219,13 @@ ok($l=~/<listlet[^>]+title="third"/,"_role_on can be disabled");
 # make a "newer" map
 # reconcile it
 # do we see changes?
-$tiny=~s/atopic\n/atopic\nin: something new!/;
+$tiny=~s/atopic\n/atopic\nin: something new\nin(btopic): odd!\n/;
 my $ntm=TM::Materialized::AsTMa->new(baseuri=>$base,inline=>$tiny);
 $ntm->sync_in;
+
+# memorize some old info first
+my $sucker=$base."btopic";
+my $oldlength=$v->style_length($sucker);
 
 my $diff=$v->reconcile($ntm);
 ok(ref($diff)eq"HASH","reconcile runs");
@@ -231,6 +235,11 @@ ok($os{"_is_changed"}==1,"reconcile flags changed topics");
 $l=$v->style_length($n);
 (undef,%os)=$v->style($n,$l-1);
 ok($os{"_is_changed"}==1,"reconcile flags changed aspects as well");
+
+
+(undef,%os)=$v->style($sucker,0);
+ok($os{"_is_changed"}==1,"type topics of new ocs get an instance-of");
+ok($v->style_length($sucker)==$oldlength+1,"type topics of new ocs are not mis-identified");
 
 # clear the whole view
 $v->clear;
